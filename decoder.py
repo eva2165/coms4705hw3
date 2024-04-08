@@ -6,7 +6,22 @@ import sys
 import numpy as np
 import keras
 
+import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
+
 from extract_training_data import FeatureExtractor, State
+
+def is_legal(action, state):
+    t, l = action
+    empty_stack = len(state.stack) == 0
+    if (t == 'left_arc' or t == 'right_arc') and empty_stack:
+        return False
+    elif (t == 'shift') and (len(state.buffer) == 1) and not empty_stack:
+        return False
+    elif (t == 'left_arc') and state.stack[-1] == 0:
+        return False
+    else:
+        return True
 
 class Parser(object): 
 
@@ -22,9 +37,28 @@ class Parser(object):
         state.stack.append(0)    
 
         while state.buffer: 
-            pass
-            # TODO: Write the body of this loop for part 4 
-
+            actions = self.model.predict(\
+                    self.extractor.get_input_representation(\
+                                words, pos, state).reshape(1,6)).tolist()[0]
+            s_actions = sorted(enumerate(actions), key=lambda x: x[1], reverse=True)
+            
+            i, found = 0, False
+            while i < len(s_actions) and not found:
+                label = self.output_labels[s_actions[i][0]]
+                if is_legal(label, state):
+                    found = True
+                    if label[0] == 'shift':
+                        state.shift()
+                    elif label[0] == 'left_arc':
+                        state.left_arc(label[1])
+                    elif label[0] == 'right_arc':
+                        state.right_arc(label[1])
+                    else:
+                        raise ValueError(f"unrecognized label {label[1]}")
+                i += 1
+            if not found:
+                raise RuntimeError("found no valid state transition")
+        
         result = DependencyStructure()
         for p,c,r in state.deps: 
             result.add_deprel(DependencyEdge(c,words[c],pos[c],p, r))

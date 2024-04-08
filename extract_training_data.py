@@ -115,12 +115,44 @@ class FeatureExtractor(object):
         return vocab     
 
     def get_input_representation(self, words, pos, state):
-        # TODO: Write this method for Part 2
-        return np.zeros(6)
+        num_is_from = 3  # Use x many entries from the top-x of the buffer and next-x of the stack
+        stack_buffer_ends = [None]*(num_is_from*2)
+        
+        for i in range(len(stack_buffer_ends)):
+            try:
+                if i < num_is_from:
+                    stack_buffer_ends[i] = state.stack[-(i+1)]
+                else:
+                    stack_buffer_ends[i] = state.buffer[-(i-num_is_from+1)]
+            except IndexError:
+                pass
+        
+        for i in range(6):
+            if stack_buffer_ends[i] is not None:
+                if pos[stack_buffer_ends[i]] == 'CD':
+                    stack_buffer_ends[i] = '<CD>'
+                elif pos[stack_buffer_ends[i]] == 'NNP':
+                    stack_buffer_ends[i] = '<NNP>'
+                elif words[stack_buffer_ends[i]] is None:
+                    stack_buffer_ends[i] = '<ROOT>'
+                elif words[stack_buffer_ends[i]].lower() not in self.word_vocab.keys():
+                    stack_buffer_ends[i] = '<UNK>'
+                else:
+                    stack_buffer_ends[i] = words[stack_buffer_ends[i]].lower()
+            else:
+                stack_buffer_ends[i] = '<NULL>'
+        
+        for i in range(6):
+            stack_buffer_ends[i] = self.word_vocab[stack_buffer_ends[i]]
+        
+        return np.array(stack_buffer_ends)
 
     def get_output_representation(self, output_pair):  
-        # TODO: Write this method for Part 2
-        return np.zeros(91)
+        return keras.utils.to_categorical(
+                self.output_labels[output_pair],
+                num_classes=91,
+                dtype='int'
+            )
 
      
     
